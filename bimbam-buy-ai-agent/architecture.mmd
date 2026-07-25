@@ -1,0 +1,63 @@
+flowchart TB
+    subgraph KB["📚 Base de conocimiento"]
+        PDF1[Política de Reembolsos<br/>y Devoluciones]
+        PDF2[FAQ Métodos de Pago]
+        PDF3[Manual de Garantía<br/>de Productos]
+        PDF4[Guía de Tiempos y<br/>Costos de Envío]
+        PDF5[Programa de Afiliados]
+    end
+
+    subgraph Ingest["⚙️ Ingesta (ingest / rag_engine.py)"]
+        Loader["Document Loader<br/>(PyPDFLoader)"]
+        Splitter["Text Splitter<br/>(chunks + overlap)"]
+        Embed["Embeddings<br/>(OpenAI / Google / Cohere)"]
+    end
+
+    subgraph Store["🗄️ Vector Store"]
+        Chroma[(ChromaDB<br/>persistido en disco)]
+    end
+
+    subgraph Runtime["🚀 Runtime del agente"]
+        Retriever["Retriever<br/>(top-k similarity search)"]
+        LLM["LLM<br/>(ChatGPT / Gemini-Gemma / Cohere)"]
+        Chain["RetrievalQA Chain<br/>(LangChain)"]
+    end
+
+    subgraph Interfaces["🖥️ Interfaces"]
+        API["FastAPI<br/>POST /ask"]
+        UI["Streamlit UI"]
+        CLI["CLI de terminal"]
+    end
+
+    User(["🧑 Usuario / Cliente"])
+
+    PDF1 & PDF2 & PDF3 & PDF4 & PDF5 --> Loader
+    Loader --> Splitter --> Embed --> Chroma
+
+    User -->|Pregunta| API
+    User -->|Pregunta| UI
+    User -->|Pregunta| CLI
+
+    API --> Chain
+    UI --> Chain
+    CLI --> Chain
+
+    Chain --> Retriever
+    Retriever -->|Consulta por similitud| Chroma
+    Chroma -->|Chunks relevantes| Retriever
+    Retriever -->|Contexto| LLM
+    LLM -->|Respuesta + fuentes citadas| Chain
+
+    Chain -->|Respuesta final| API
+    Chain -->|Respuesta final| UI
+    Chain -->|Respuesta final| CLI
+
+    API -->|JSON| User
+    UI -->|Chat| User
+    CLI -->|Texto| User
+
+    subgraph Deploy["☁️ Deploy"]
+        OCI["Oracle Cloud Infrastructure<br/>(OCI Compute + Docker)"]
+    end
+
+    API -.contenerizado con Docker.-> OCI
