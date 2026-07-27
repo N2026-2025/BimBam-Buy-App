@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+
+  - name: Postgres-Monitoring
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: bimbam_monitoring
+    user: bimbam
+    secureJsonData:
+      password: bimbam
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false

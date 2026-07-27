@@ -1,0 +1,51 @@
+version: "3.9"
+
+# Stack de observabilidad, siguiendo el patrón de llm-zoomcamp 05-monitoring:
+# Postgres guarda cada interacción (pregunta, respuesta, fuentes, latencias,
+# feedback); Prometheus scrapea las métricas en vivo de la API; Grafana
+# visualiza ambas fuentes en un mismo dashboard.
+#
+# Uso combinado con el stack principal:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bimbam-buy-postgres
+    environment:
+      POSTGRES_USER: bimbam
+      POSTGRES_PASSWORD: bimbam
+      POSTGRES_DB: bimbam_monitoring
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bimbam-buy-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bimbam-buy-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+      - postgres
+
+volumes:
+  postgres_data:

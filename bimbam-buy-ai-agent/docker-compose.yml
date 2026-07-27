@@ -1,5 +1,10 @@
 version: "3.9"
 
+# Stack principal (API + UI). Para sumar observabilidad completa
+# (Postgres + Prometheus + Grafana), correr junto con docker-compose.monitoring.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
+# y setear en .env: MONITORING_DB_URL=postgresql+psycopg2://bimbam:bimbam@postgres:5432/bimbam_monitoring
+
 services:
   api:
     build: .
@@ -11,6 +16,7 @@ services:
     volumes:
       - ./data:/app/data
       - chroma_data:/app/chroma_db
+      - monitoring_data:/app/monitoring_data
 
   ui:
     build: .
@@ -23,8 +29,10 @@ services:
     volumes:
       - ./data:/app/data
       - chroma_data:/app/chroma_db
+      - monitoring_data:/app/monitoring_data
     depends_on:
       - api
 
 volumes:
   chroma_data:
+  monitoring_data:

@@ -1,63 +1,121 @@
 flowchart TB
-    subgraph KB["📚 Base de conocimiento"]
+    subgraph KB["📚 Base de conocimiento (data/)"]
         PDF1[Política de Reembolsos<br/>y Devoluciones]
         PDF2[FAQ Métodos de Pago]
-        PDF3[Manual de Garantía<br/>de Productos]
-        PDF4[Guía de Tiempos y<br/>Costos de Envío]
+        PDF3[Manual de Garantía]
+        PDF4[Guía de Envíos]
         PDF5[Programa de Afiliados]
+        PDFn[PDF escaneado<br/>ej. comprobante]
     end
 
-    subgraph Ingest["⚙️ Ingesta (ingest / rag_engine.py)"]
+    subgraph Ingest["⚙️ Ingesta — rag/loaders.py + rag/pipeline.py"]
         Loader["Document Loader<br/>(PyPDFLoader)"]
-        Splitter["Text Splitter<br/>(chunks + overlap)"]
+        OCR{"¿Texto extraíble<br/>&lt; umbral?"}
+        Tesseract["OCR<br/>(pdf2image + Tesseract)"]
+        Splitter["Text Splitter<br/>(chunks + overlap + chunk_id)"]
         Embed["Embeddings<br/>(OpenAI / Google / Cohere)"]
     end
 
-    subgraph Store["🗄️ Vector Store"]
-        Chroma[(ChromaDB<br/>persistido en disco)]
+    subgraph Store["🗄️ Índices"]
+        Chroma[(ChromaDB<br/>vector store)]
+        BM25[(Índice BM25<br/>keywords)]
     end
 
-    subgraph Runtime["🚀 Runtime del agente"]
-        Retriever["Retriever<br/>(top-k similarity search)"]
+    subgraph Memory["🧠 Memoria multi-turno — rag/memory.py"]
+        History[(Historial por<br/>session_id)]
+        Contextualize["Contextualización<br/>(reformula pregunta<br/>de seguimiento con LLM)"]
+    end
+
+    subgraph Retrieval["🔎 Recuperación híbrida — rag/hybrid_search.py"]
+        VecSearch["Búsqueda semántica<br/>(top-k vectorial)"]
+        KwSearch["Búsqueda por keywords<br/>(top-k BM25)"]
+        RRF["Reciprocal Rank Fusion<br/>(fusiona ambos rankings)"]
+    end
+
+    subgraph Rerank["🎯 Reranking — rag/reranker.py"]
+        CrossEnc["Cross-Encoder<br/>(mmarco-mMiniLM, multilingüe)"]
+    end
+
+    subgraph Gen["✍️ Generación"]
         LLM["LLM<br/>(ChatGPT / Gemini-Gemma / Cohere)"]
-        Chain["RetrievalQA Chain<br/>(LangChain)"]
     end
 
     subgraph Interfaces["🖥️ Interfaces"]
-        API["FastAPI<br/>POST /ask"]
+        API["FastAPI<br/>POST /ask · /feedback"]
         UI["Streamlit UI"]
         CLI["CLI de terminal"]
+        VoiceAPI["FastAPI<br/>POST /voice/ask"]
     end
 
-    User(["🧑 Usuario / Cliente"])
+    subgraph VoicePipe["🎙️ Interfaz de voz — voice/"]
+        STT["STT (Whisper)<br/>audio → texto"]
+        TTS["TTS<br/>texto → audio"]
+    end
 
-    PDF1 & PDF2 & PDF3 & PDF4 & PDF5 --> Loader
-    Loader --> Splitter --> Embed --> Chroma
+    subgraph Obs["📈 Monitoreo y observabilidad — monitoring/"]
+        Logs[("Postgres / SQLite<br/>log de interacciones")]
+        Prom["Prometheus<br/>(/metrics)"]
+        Grafana["Grafana<br/>dashboard"]
+    end
 
-    User -->|Pregunta| API
-    User -->|Pregunta| UI
-    User -->|Pregunta| CLI
-
-    API --> Chain
-    UI --> Chain
-    CLI --> Chain
-
-    Chain --> Retriever
-    Retriever -->|Consulta por similitud| Chroma
-    Chroma -->|Chunks relevantes| Retriever
-    Retriever -->|Contexto| LLM
-    LLM -->|Respuesta + fuentes citadas| Chain
-
-    Chain -->|Respuesta final| API
-    Chain -->|Respuesta final| UI
-    Chain -->|Respuesta final| CLI
-
-    API -->|JSON| User
-    UI -->|Chat| User
-    CLI -->|Texto| User
+    subgraph Eval["🧪 Evaluación offline — evaluation/"]
+        GT["Ground truth<br/>(preguntas generadas por LLM<br/>por chunk)"]
+        RetrievalEval["Hit Rate / MRR<br/>(vector vs BM25 vs híbrido+rerank)"]
+        AnswerEval["LLM-as-judge<br/>+ cosine similarity"]
+    end
 
     subgraph Deploy["☁️ Deploy"]
         OCI["Oracle Cloud Infrastructure<br/>(OCI Compute + Docker)"]
     end
+
+    User(["🧑 Usuario / Cliente"])
+
+    PDF1 & PDF2 & PDF3 & PDF4 & PDF5 & PDFn --> Loader
+    Loader --> OCR
+    OCR -- sí --> Tesseract --> Splitter
+    OCR -- no --> Splitter
+    Splitter --> Embed --> Chroma
+    Splitter --> BM25
+
+    User -->|Texto| API
+    User -->|Texto| UI
+    User -->|Texto| CLI
+    User -->|Audio| VoiceAPI
+    VoiceAPI --> STT --> API
+
+    API --> Contextualize
+    UI --> Contextualize
+    CLI --> Contextualize
+    Contextualize --> History
+    History --> Contextualize
+
+    Contextualize -->|pregunta independiente| VecSearch
+    Contextualize -->|pregunta independiente| KwSearch
+    VecSearch --> Chroma
+    KwSearch --> BM25
+    VecSearch --> RRF
+    KwSearch --> RRF
+    RRF -->|~10-20 candidatos| CrossEnc
+    CrossEnc -->|top-N preciso| LLM
+    LLM -->|respuesta + fuentes| API
+    LLM --> UI
+    LLM --> CLI
+
+    API -->|texto| Logs
+    API -->|texto| Prom
+    result_voice[Respuesta] -.-> TTS
+    LLM -.-> TTS
+    TTS -->|audio| VoiceAPI
+    VoiceAPI -->|JSON: texto + audio base64| User
+
+    Prom --> Grafana
+    Logs --> Grafana
+
+    GT -.usa chunks indexados.-> Splitter
+    GT --> RetrievalEval
+    RetrievalEval -.compara.-> RRF
+    RetrievalEval -.compara.-> CrossEnc
+    GT --> AnswerEval
+    AnswerEval -.evalúa.-> LLM
 
     API -.contenerizado con Docker.-> OCI
