@@ -1,4 +1,4 @@
-
+.env.example
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md

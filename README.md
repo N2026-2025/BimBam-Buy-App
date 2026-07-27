@@ -246,5 +246,207 @@ bimbam-buy-ai-agent/
 
 ## 🏆 Proyecto
 
-El objetivo del challenge es diseñar, implementar y desplegar un agente potenciado por IA capaz de
+El objetivo es diseñar, implementar y desplegar un agente potenciado por IA capaz de
 responder preguntas a partir de documentación de negocio, utilizando técnicas modernas de IA Generativa y RAG.
+
+Logros con Metodologia STAR
+
+1. Implementación de pipeline de datos en tiempo real
+   Situación: La empresa necesitaba calcular riesgo de churn en clientes de telecomunicaciones con datos que llegaban en tiempo real.
+   Tarea: Diseñar un flujo ETL que procesara eventos de llamadas y métricas de clientes.
+   Acción: Implementé un pipeline con Java Streams y Spring Boot 3.4, usando colas de eventos y bases de datos Postgres/H2.
+   Resultado: Se redujo el tiempo de cálculo de riesgo de churn de horas a segundos, aumentando la precisión del modelo en un 15%.
+2. Optimización de consumo de eventos con Virtual Threads
+   Situación: Los consumidores de eventos eran I/O-bound y generaban cuellos de botella.
+   Tarea: Mejorar la eficiencia del procesamiento concurrente.
+   Acción: Incorporé Virtual Threads (Project Loom) para manejar miles de eventos simultáneos sin degradar rendimiento.
+   Resultado: Se logró un 40% de mejora en throughput y reducción significativa en uso de recursos.
+3. Motor de activación de packs móviles
+   Situación: El proceso de activación de packs de datos móviles dependía de llamadas HTTP síncronas poco escalables.
+   Tarea: Rediseñar la arquitectura para soportar activaciones masivas.
+   Acción: Implementé microservicios de sales-service y provisioning-service con comunicación asincrónica vía Kafka.
+   Resultado: Se aumentó la capacidad de activación en un 300%, garantizando resiliencia y trazabilidad de eventos.
+4. Orquestación reproducible con Docker Compose
+   Situación: Los entornos de desarrollo eran inconsistentes y difíciles de replicar.
+   Tarea: Crear un entorno reproducible para pruebas e integración.
+   Acción: Configuré Docker Compose con Postgres, Kafka, Zookeeper y microservicios.
+   Resultado: Se redujo el tiempo de onboarding de nuevos desarrolladores de días a horas, asegurando 100% reproducibilidad.
+
+## Pasos Rapidos
+
+Paso 1: Crear la carpeta e inicializar el proyecto
+
+Crea el directorio para tu reto e inicializa un entorno de Python ultra rápido usando `uv`:
+
+bash
+
+```
+mkdir bimbam buy-onnx && cd bimbam buy-onnx
+uv init --no-workspace
+```
+
+Usa el código con precaución.
+
+Paso 2: Instalar las dependencias ligeras
+
+Instala los paquetes necesarios para ejecutar ONNX, manejar los vectores con NumPy y conectarte a la API de Google:
+
+bash
+
+```
+uv add onnxruntime tokenizers numpy google-genai
+uv add --dev huggingface-hub
+```
+
+Usa el código con precaución.
+
+Paso 3: Crear el script de descarga y bajar el modelo
+
+Crea el archivo para descargar el modelo ONNX desde Hugging Face:
+
+bash
+
+```
+cat << 'EOF' > download.py
+import os
+from huggingface_hub import hf_hub_download
+
+MODEL_ID = "Xenova/all-MiniLM-L6-v2"
+FILES = ["model.onnx", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json"]
+
+print(f"Descargando componentes de {MODEL_ID}...")
+for file in FILES:
+    dest_path = os.path.join("models", MODEL_ID)
+    os.makedirs(dest_path, exist_ok=True)
+    hf_hub_download(repo_id=MODEL_ID, filename=file, local_dir=dest_path, local_dir_use_symlinks=False)
+print("¡Descarga completada con éxito en /models!")
+EOF
+```
+
+Usa el código con precaución.
+
+Ahora ejecuta la descarga (esto solo se hace una vez):
+
+bash
+
+```
+uv run python download.py
+```
+
+Usa el código con precaución.
+
+Paso 4: Crear la clase del Embedder ONNX
+
+Crea el archivo que procesará los textos y los convertirá en vectores usando únicamente la CPU:
+
+bash
+
+```
+cat << 'EOF' > embedder.py
+import os
+import numpy as np
+import onnxruntime as ort
+from tokenizers import Tokenizer
+
+class Embedder:
+    def __init__(self, model_dir="models/Xenova/all-MiniLM-L6-v2"):
+        self.tokenizer = Tokenizer.from_file(os.path.join(model_dir, "tokenizer.json"))
+        self.session = ort.InferenceSession(os.path.join(model_dir, "model.onnx"), providers=["CPUExecutionProvider"])
+
+    def _normalize(self, vectors):
+        norm = np.linalg.norm(vectors, axis=1, keepdims=True)
+        return vectors / np.where(norm == 0, 1e-12, norm)
+
+    def encode_batch(self, texts):
+        encodings = self.tokenizer.encode_batch(texts)
+        input_ids = np.array([e.ids for e in encodings], dtype=np.int64)
+        attention_mask = np.array([e.attention_mask for e in encodings], dtype=np.int64)
+      
+        inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
+        model_inputs = [i.name for i in self.session.get_inputs()]
+        if "token_type_ids" in model_inputs:
+            inputs["token_type_ids"] = np.zeros_like(input_ids)
+
+        outputs = self.session.run(None, inputs)[0]
+        input_mask_expanded = np.expand_dims(attention_mask, axis=-1).astype(float)
+        sum_embeddings = np.sum(outputs * input_mask_expanded, axis=1)
+        sum_mask = np.clip(np.sum(input_mask_expanded, axis=1), a_min=1e-9, a_max=None)
+      
+        return self._normalize(sum_embeddings / sum_mask)
+
+    def encode(self, text):
+        return self.encode_batch([text])[0]
+EOF
+```
+
+Usa el código con precaución.
+
+Paso 5: Crear el script del flujo RAG
+
+Crea el script de prueba que unirá tu base de datos vectorial local con Gemini:
+
+bash
+
+```
+cat << 'EOF' > test_rag.py
+import os
+import numpy as np
+from google import genai
+from embedder import Embedder
+
+def main():
+    if not os.environ.get("GEMINI_API_KEY"):
+        print("❌ Error: La variable de entorno GEMINI_API_KEY no está configurada.")
+        return
+
+    print("🤖 Inicializando cliente de Google GenAI y Embedder ONNX...")
+    ai_client = genai.Client()
+    embedder = Embedder()
+
+    documents = [
+        {"id": 1, "text": "Para el LLM Zoomcamp Challenge, la fecha límite de entrega es el próximo domingo a la medianoche. No se aceptan entregas tardías."},
+        {"id": 2, "text": "Para instalar Docker en Windows, descarga Docker Desktop desde el sitio oficial y asegúrate de tener habilitado WSL2 en las características de Windows."},
+        {"id": 3, "text": "La capa gratuita de Oracle Cloud (Always Free) te permite crear hasta dos bases de datos autónomas y usar instancias de cómputo Ampere ARM sin costo."}
+    ]
+
+    print("📦 Indexando documentos localmente con ONNX...")
+    texts_to_embed = [doc["text"] for doc in documents]
+    doc_vectors = embedder.encode_batch(texts_to_embed)
+
+    query = "¿Cuándo tengo que entregar el desafío del Zoomcamp?"
+    print(f"\n❓ Consulta del usuario: '{query}'")
+    query_vector = embedder.encode(query)
+
+    scores = np.dot(doc_vectors, query_vector)
+    best_idx = np.argmax(scores)
+    context = documents[best_idx]["text"]
+  
+    print(f"🎯 Documento más relevante encontrado (Score: {scores[best_idx]:.4f}):\n   '{context}'")
+    print("\n🚀 Enviando contexto y pregunta a Gemini...")
+  
+    prompt = f"Responde la pregunta del usuario utilizando únicamente el contexto provisto.\n\nContexto:\n{context}\n\nPregunta:\n{query}\n\nRespuesta:"
+
+    response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+    print(f"\n✨ Respuesta final de Gemini:\n{'-'*50}\n{response.text}\n{'-'*50}")
+
+if __name__ == "__main__":
+    main()
+EOF
+```
+
+Usa el código con precaución.
+
+Paso 6: Configurar tu API Key y ejecutar
+
+Reemplaza `"TU_API_KEY_AQUI"` con tu clave real de Google AI Studio y ejecuta el pipeline completo:
+
+bash
+
+```
+export GEMINI_API_KEY="TU_API_KEY_AQUI"
+uv run python test_rag.py
+```
+
+Usa el código con precaución.
+
+---
