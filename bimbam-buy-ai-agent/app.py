@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 
 from rag.pipeline import get_pipeline
 from rag.memory import new_session_id
-from rag_engine import answer_question
+from rag.graph import create_graph
 from monitoring.logging_db import log_interaction, save_feedback, get_stats
 from monitoring.metrics import (
     ERRORS_TOTAL,
@@ -43,12 +43,14 @@ from voice.stt import transcribe_audio
 from voice.tts import synthesize_speech
 
 pipeline = None
+graph = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pipeline
+    global pipeline, graph
     pipeline = get_pipeline()
+    graph = create_graph()
     yield
 
 
@@ -111,29 +113,29 @@ def health_ready():
 # --------------------------------------------------------------------------- #
 @app.post("/ask", response_model=AskResponse)
 def ask(payload: AskRequest):
-    if pipeline is None:
+    if graph is None:
         raise HTTPException(status_code=503, detail="El agente todavía no está listo")
 
     REQUESTS_TOTAL.labels(endpoint="/ask").inc()
     session_id = payload.session_id or new_session_id()
 
     try:
-        result = answer_question(payload.question, session_id=session_id, pipeline=pipeline)
+        # Invocación del grafo
+        result = graph.invoke({
+            "question": payload.question,
+            "session_id": session_id
+        })
     except Exception as exc:  # noqa: BLE001
         ERRORS_TOTAL.labels(endpoint="/ask").inc()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-    record_result_metrics("/ask", result["timings_ms"])
+    record_result_metrics("/ask", result.get("timings_ms", {}))
     interaction_id = log_interaction(result)
 
     return {
         "interaction_id": interaction_id,
         "session_id": session_id,
-        "question": result["question"],
-        "standalone_question": result["standalone_question"],
-        "answer": result["answer"],
-        "sources": result["sources"],
-        "timings_ms": result["timings_ms"],
+        **result
     }
 
 
@@ -199,7 +201,7 @@ async def voice_ask(audio: UploadFile = File(...), session_id: str | None = None
     (en base64, ya que los headers HTTP no son seguros para texto en
     español con tildes/ñ).
     """
-    if pipeline is None:
+    if graph is None:
         raise HTTPException(status_code=503, detail="El agente todavía no está listo")
 
     import base64
@@ -215,8 +217,14 @@ async def voice_ask(audio: UploadFile = File(...), session_id: str | None = None
         raise HTTPException(status_code=500, detail=f"Error al transcribir el audio: {exc}") from exc
 
     session_id = session_id or new_session_id()
-    result = answer_question(question_text, session_id=session_id, pipeline=pipeline)
-    record_result_metrics("/voice/ask", result["timings_ms"])
+    
+    # Invocación del grafo
+    result = graph.invoke({
+        "question": question_text,
+        "session_id": session_id
+    })
+    
+    record_result_metrics("/voice/ask", result.get("timings_ms", {}))
     interaction_id = log_interaction(result)
 
     try:
