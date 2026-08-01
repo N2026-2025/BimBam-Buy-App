@@ -83,6 +83,9 @@ def get_embeddings():
     if EMBEDDINGS_PROVIDER == "cohere":
         from langchain_cohere import CohereEmbeddings
         return CohereEmbeddings(model=EMBEDDINGS_MODEL)
+    if EMBEDDINGS_PROVIDER == "local":
+        from rag.embeddings_local import ONNXEmbeddings
+        return ONNXEmbeddings()
     raise ValueError(f"EMBEDDINGS_PROVIDER no soportado: {EMBEDDINGS_PROVIDER}")
 
 
