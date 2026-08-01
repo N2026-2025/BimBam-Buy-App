@@ -54,8 +54,8 @@ class ONNXEmbeddings(Embeddings):
         for i in range(0, len(texts), self.batch_size):
             batch = texts[i : i + self.batch_size]
             batch_vectors = self._embedder.encode_batch(batch)
-            vectors.extend(v.tolist() for v in batch_vectors)
+            vectors.extend(batch_vectors)
         return vectors
 
     def embed_query(self, text: str) -> List[float]:
-        return self._embedder.encode(text).tolist()
+        return self._embedder.encode(text)
