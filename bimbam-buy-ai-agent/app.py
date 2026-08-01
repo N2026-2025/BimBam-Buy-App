@@ -135,7 +135,11 @@ def ask(payload: AskRequest):
     return {
         "interaction_id": interaction_id,
         "session_id": session_id,
-        **result
+        "question": payload.question,
+        "standalone_question": result["standalone_question"],
+        "answer": result["answer"],
+        "sources": result["sources"],
+        "timings_ms": result["timings_ms"],
     }
 
 
