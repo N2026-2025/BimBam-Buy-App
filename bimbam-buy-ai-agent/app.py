@@ -161,6 +161,35 @@ def stats():
 
 
 # --------------------------------------------------------------------------- #
+# Administración / orquestación (usado por el flow de Kestra ingest_knowledge_base)
+# --------------------------------------------------------------------------- #
+class ReindexResponse(BaseModel):
+    status: str
+    chunks_indexed: int
+
+
+@app.post("/admin/reindex", response_model=ReindexResponse)
+def admin_reindex():
+    """Reconstruye el índice (vector store + BM25) desde los PDFs en `data/`.
+
+    Pensado para ser disparado por un orquestador externo (Kestra) cuando se
+    agregan o actualizan documentos en la base de conocimiento, en vez de
+    reconstruir el índice manualmente o reiniciar el proceso.
+    """
+    global pipeline
+    if pipeline is None:
+        raise HTTPException(status_code=503, detail="El agente todavía no está listo")
+
+    try:
+        pipeline.build(force_rebuild=True)
+    except Exception as exc:  # noqa: BLE001
+        ERRORS_TOTAL.labels(endpoint="/admin/reindex").inc()
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    return {"status": "reindexed", "chunks_indexed": len(pipeline._chunks)}
+
+
+# --------------------------------------------------------------------------- #
 # Interfaz de voz: audio -> texto -> RAG -> texto -> audio
 # --------------------------------------------------------------------------- #
 @app.post("/voice/ask")
