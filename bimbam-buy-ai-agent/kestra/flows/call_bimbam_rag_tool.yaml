@@ -1,0 +1,77 @@
+# kestra/flows/call_bimbam_rag_tool.yaml
+# -----------------------------------------------------------------------------
+# Sub-flow que encapsula una llamada al RAG interno de BimBam Buy (POST /ask
+# de app.py: hybrid search + reranking + memoria multi-turno).
+#
+# Se usa de dos formas:
+#   1. Standalone: disparado directo (API, UI de Kestra) para probar el RAG
+#      sin pasar por el agente.
+#   2. Como TOOL del agente: `bimbam_support_agent.yaml` lo invoca vía
+#      `io.kestra.plugin.ai.tool.KestraFlow`, que le permite al LLM decidir
+#      CUÁNDO llamarlo (patrón agentic RAG, no un pipeline fijo).
+#
+# Nota: verificá los nombres exactos de propiedades del plugin
+# io.kestra.plugin.scripts.python.Script contra la versión de Kestra que
+# tengas instalada (pueden variar entre versiones).
+# -----------------------------------------------------------------------------
+
+id: call_bimbam_rag
+namespace: bimbam.buy
+
+description: >
+  Consulta la base de conocimiento oficial de BimBam Buy (política de
+  reembolsos, garantía, envíos, pagos y programa de afiliados) usando el
+  pipeline RAG (hybrid search + reranking). Devuelve la respuesta y las
+  fuentes citadas.
+
+inputs:
+  - id: question
+    type: STRING
+    required: true
+    description: Pregunta del cliente en lenguaje natural.
+  - id: session_id
+    type: STRING
+    required: false
+    description: Id de conversación, para mantener memoria multi-turno entre llamadas.
+
+tasks:
+  - id: query_rag
+    type: io.kestra.plugin.scripts.python.Script
+    containerImage: python:3.11-slim
+    beforeCommands:
+      - pip install requests --quiet
+    env:
+      BIMBAM_API_URL: "{{ secret('BIMBAM_API_URL') }}"   # ej: http://api:8000
+      QUESTION: "{{ inputs.question }}"
+      SESSION_ID: "{{ inputs.session_id ?? '' }}"
+    script: |
+      import os
+      import requests
+      from kestra import Kestra
+
+      url = os.environ["BIMBAM_API_URL"].rstrip("/") + "/ask"
+      payload = {"question": os.environ["QUESTION"]}
+      if os.environ.get("SESSION_ID"):
+          payload["session_id"] = os.environ["SESSION_ID"]
+
+      response = requests.post(url, json=payload, timeout=30)
+      response.raise_for_status()
+      data = response.json()
+
+      Kestra.outputs({
+          "answer": data["answer"],
+          "sources": ", ".join(data.get("sources", [])),
+          "session_id": data.get("session_id", ""),
+          "found_in_kb": "no tengo esa información" not in data["answer"].lower(),
+      })
+
+outputs:
+  - id: answer
+    type: STRING
+    value: "{{ outputs.query_rag.vars.answer }}"
+  - id: sources
+    type: STRING
+    value: "{{ outputs.query_rag.vars.sources }}"
+  - id: session_id
+    type: STRING
+    value: "{{ outputs.query_rag.vars.session_id }}"

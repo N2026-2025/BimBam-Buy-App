@@ -17,7 +17,7 @@ Este módulo es agnóstico de interfaz: tanto `app.py` (FastAPI), `cli.py`
 
 Proveedor de LLM y de embeddings configurable por variables de entorno,
 para poder alternar entre OpenAI (ChatGPT), Google (Gemini/Gemma) o Cohere
-sin tocar el resto del código, tal como sugiere el challenge de Alura + ONE.
+sin tocar el resto del código.
 -----------------------------------------------------------------------------
 """
 

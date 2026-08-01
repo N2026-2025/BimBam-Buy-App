@@ -13,7 +13,14 @@ ONNX_CANDIDATES = [
     "model.onnx",
 ]
 
-def download(repo, dest="models"):
+# Raíz del proyecto (dos niveles arriba de rag/local_embeddings/download.py),
+# para que el destino sea el mismo sin importar desde dónde se invoque el
+# script (CLI directo, `python -m rag.local_embeddings.download`, Docker, etc.)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_DEST = PROJECT_ROOT / "models"
+
+
+def download(repo, dest=DEFAULT_DEST):
     dest = Path(dest) / repo
     dest.mkdir(parents=True, exist_ok=True)
 
@@ -45,4 +52,15 @@ def download(repo, dest="models"):
             print(f"  exists {dst}")
 
 if __name__ == "__main__":
-    download("Xenova/all-MiniLM-L6-v2")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Descarga un modelo ONNX de embeddings desde Hugging Face Hub.")
+    parser.add_argument(
+        "--repo",
+        default=os.getenv("LOCAL_EMBEDDINGS_MODEL_REPO", "Xenova/all-MiniLM-L6-v2"),
+        help="Repo de Hugging Face con el modelo en formato ONNX (default: %(default)s)",
+    )
+    args = parser.parse_args()
+    print(f"Descargando modelo de embeddings: {args.repo}")
+    download(args.repo)
+    print("Listo.")

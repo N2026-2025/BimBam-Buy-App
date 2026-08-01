@@ -1,0 +1,53 @@
+version: "3.9"
+
+# Kestra local (backend H2, almacenamiento en disco) para desarrollar y
+# probar los flows de kestra/flows/. Para producción, Kestra recomienda un
+# backend Postgres + almacenamiento en S3/GCS/Azure — ver la documentación
+# oficial: https://kestra.io/docs/installation
+#
+# Uso:
+#   docker compose -f docker-compose.yml -f docker-compose.orchestration.yml up --build
+#
+# Luego:
+#   1. Abrir http://localhost:8080
+#   2. Cargar los secrets necesarios (Settings -> Secrets, o variables de
+#      entorno SECRET_<NOMBRE> en base64 — ver README):
+#        GEMINI_API_KEY, TAVILY_API_KEY, BIMBAM_API_URL, BIMBAM_REINDEX_WEBHOOK_KEY
+#   3. Subir los flows de kestra/flows/ (UI: "Create" -> pegar el YAML, o
+#      CLI: kestra flow namespace update bimbam.buy kestra/flows)
+
+services:
+  kestra:
+    image: kestra/kestra:latest
+    pull_policy: always
+    user: "root"
+    container_name: bimbam-buy-kestra
+    command: server local
+    volumes:
+      - kestra_data:/app/storage
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./kestra/flows:/app/flows
+    environment:
+      KESTRA_CONFIGURATION: |
+        kestra:
+          server:
+            basicAuth:
+              enabled: false
+          repository:
+            type: h2
+          storage:
+            type: local
+            local:
+              base-path: "/app/storage"
+          queue:
+            type: h2
+          tasks:
+            tmpDir:
+              path: /tmp/kestra-wd/tmp
+    ports:
+      - "8080:8080"
+    networks:
+      - default
+
+volumes:
+  kestra_data:

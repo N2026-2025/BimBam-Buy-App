@@ -1,7 +1,7 @@
 # 🤖 BimBam Buy AI Support Agent
 
 Agente RAG (Retrieval-Augmented Generation) **avanzado**, desarrollado para el
-**Challenge Agente IA de Alura + Oracle Next Education (ONE)**.
+LLM ZOOMCAMP. 
 
 Responde preguntas de soporte al cliente usando la documentación oficial de
 la empresa (PDFs, con soporte OCR para escaneados), combinando **búsqueda
@@ -74,9 +74,11 @@ Esta versión extiende el MVP inicial con 7 capacidades adicionales de nivel
 "AI engineer", cada una siguiendo un módulo específico de llm-zoomcamp:
 
 ### 1. Recuperación multi-documento con re-ranking
+
 `rag/hybrid_search.py` + `rag/reranker.py`
 
 Pipeline de dos etapas (patrón estándar de la industria):
+
 - **Stage 1 (recall):** búsqueda BM25 (keywords) + búsqueda vectorial
   (embeddings), fusionadas con **Reciprocal Rank Fusion (RRF)** — evita el
   problema de mezclar escalas incompatibles (score BM25 vs. similaridad
@@ -86,6 +88,7 @@ Pipeline de dos etapas (patrón estándar de la industria):
   candidato juntos, y reordena por relevancia real antes de pasarlos al LLM.
 
 ### 2. Memoria conversacional (multi-turno)
+
 `rag/memory.py`
 
 Cada conversación tiene un `session_id`. Ante una pregunta de seguimiento
@@ -94,6 +97,7 @@ independiente** usando el historial reciente, antes de mandarla al
 retriever — si no, el retriever buscaría con muy poca señal semántica.
 
 ### 3. Búsqueda híbrida (keyword + semántica)
+
 `rag/hybrid_search.py`
 
 Ver punto 1: BM25 resuelve bien coincidencias exactas (números de orden,
@@ -102,6 +106,7 @@ vectorial resuelve paráfrasis y preguntas conceptuales. RRF combina lo
 mejor de ambas sin necesidad de calibrar pesos.
 
 ### 4. Soporte OCR para documentos escaneados
+
 `rag/loaders.py`
 
 Si una página de un PDF no tiene suficiente texto extraíble (menos de
@@ -110,9 +115,11 @@ aplica OCR (`pytesseract`, en español) automáticamente, sin intervención
 manual. Útil para comprobantes, boletas o contratos escaneados.
 
 ### 5. Pipeline de evaluación de calidad de respuestas
+
 `evaluation/`
 
 Siguiendo llm-zoomcamp 04-evaluation:
+
 - `generate_ground_truth.py`: le pide al LLM que genere preguntas
   realistas por cada chunk de la base de conocimiento (dataset
   pregunta → chunk esperado, sin armarlo a mano).
@@ -123,9 +130,11 @@ Siguiendo llm-zoomcamp 04-evaluation:
   pregunta y respuesta como métrica automática complementaria.
 
 ### 6. Monitoreo y observabilidad (logs, métricas, trazas)
+
 `monitoring/`
 
 Siguiendo llm-zoomcamp 05-monitoring:
+
 - **Logging estructurado**: cada interacción (pregunta, pregunta
   reformulada, respuesta, fuentes, tiempos por etapa, feedback del usuario)
   se guarda en Postgres/SQLite (`monitoring/logging_db.py`).
@@ -136,6 +145,7 @@ Siguiendo llm-zoomcamp 05-monitoring:
   métricas en vivo (Prometheus) con datos históricos (Postgres).
 
 ### 7. Interfaz de voz
+
 `voice/`
 
 `POST /voice/ask` recibe un audio, lo transcribe (Whisper), lo procesa con
@@ -145,34 +155,34 @@ audio codificado en base64.
 
 ## 🛠️ Tecnologías
 
-| Categoría | Tecnología |
-|---|---|
-| Lenguaje | Python |
-| Orquestación RAG | LangChain |
-| Lectura de PDF | PyPDF (`PyPDFLoader`) |
-| OCR | Tesseract (`pytesseract` + `pdf2image`) |
-| Vector store | ChromaDB |
-| Búsqueda por keywords | BM25 (`rank-bm25`) |
-| Reranking | Cross-Encoder (`sentence-transformers`) |
-| LLM / Embeddings | ChatGPT (OpenAI), Gemini/Gemma (Google) o Cohere — configurable |
-| Voz | Whisper (STT) + TTS de OpenAI |
-| API | FastAPI |
-| UI | Streamlit |
-| Logging de interacciones | SQLAlchemy (SQLite / Postgres) |
-| Métricas | Prometheus |
-| Dashboards | Grafana |
-| Contenedores | Docker / Docker Compose |
-| Cloud | Oracle Cloud Infrastructure (OCI) |
+| Categoría               | Tecnología                                                      |
+| ------------------------ | ---------------------------------------------------------------- |
+| Lenguaje                 | Python                                                           |
+| Orquestación RAG        | LangChain                                                        |
+| Lectura de PDF           | PyPDF (`PyPDFLoader`)                                          |
+| OCR                      | Tesseract (`pytesseract` + `pdf2image`)                      |
+| Vector store             | ChromaDB                                                         |
+| Búsqueda por keywords   | BM25 (`rank-bm25`)                                             |
+| Reranking                | Cross-Encoder (`sentence-transformers`)                        |
+| LLM / Embeddings         | ChatGPT (OpenAI), Gemini/Gemma (Google) o Cohere — configurable |
+| Voz                      | Whisper (STT) + TTS de OpenAI                                    |
+| API                      | FastAPI                                                          |
+| UI                       | Streamlit                                                        |
+| Logging de interacciones | SQLAlchemy (SQLite / Postgres)                                   |
+| Métricas                | Prometheus                                                       |
+| Dashboards               | Grafana                                                          |
+| Contenedores             | Docker / Docker Compose                                          |
+| Cloud                    | Oracle Cloud Infrastructure (OCI)                                |
 
 ## 📚 Base de conocimiento
 
-| Archivo | Contenido |
-|---|---|
-| `politica_reembolsos_devoluciones.pdf` | Política de Reembolsos y Devoluciones |
-| `faq_metodos_pago.pdf` | Preguntas Frecuentes sobre Métodos de Pago |
-| `manual_garantia_productos.pdf` | Manual de Garantía de Productos |
-| `guia_tiempos_costos_envio.pdf` | Guía de Tiempos y Costos de Envío |
-| `programa_afiliados.pdf` | Programa de Afiliados |
+| Archivo                                  | Contenido                                   |
+| ---------------------------------------- | ------------------------------------------- |
+| `politica_reembolsos_devoluciones.pdf` | Política de Reembolsos y Devoluciones      |
+| `faq_metodos_pago.pdf`                 | Preguntas Frecuentes sobre Métodos de Pago |
+| `manual_garantia_productos.pdf`        | Manual de Garantía de Productos            |
+| `guia_tiempos_costos_envio.pdf`        | Guía de Tiempos y Costos de Envío         |
+| `programa_afiliados.pdf`               | Programa de Afiliados                       |
 
 ## ⚙️ Instrucciones para ejecutar el proyecto
 
@@ -379,14 +389,11 @@ bimbam-buy-ai-agent/
 - Trazas distribuidas (OpenTelemetry) además de métricas y logs
 - Autenticación y rate limiting en la API
 
-## 🏆 Challenge Alura + ONE
+## 🏆 Proyecto
 
-Este proyecto fue desarrollado para el **Challenge Agente IA de
-Alura + Oracle Next Education (ONE)**. El objetivo del challenge es
-diseñar, implementar y desplegar un agente potenciado por IA capaz de
+El objetivo es diseñar, implementar y desplegar un agente potenciado por IA capaz de
 responder preguntas a partir de documentación de negocio, utilizando
 técnicas modernas de IA Generativa y RAG. Esta versión extiende el MVP
 inicial aplicando prácticas de ingeniería de IA de nivel productivo,
-inspiradas en [DataTalksClub/llm-zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp)
-(vector search, orquestación, evaluación, monitoreo y mejores prácticas de
+inspiradas en [DataTalksClub/llm-zoomcamp](https://github.com/DataTalksClub/llm-zoomcamp) (vector search, orquestación, evaluación, monitoreo y mejores prácticas de
 RAG como hybrid search y reranking).

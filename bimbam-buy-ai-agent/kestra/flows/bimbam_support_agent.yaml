@@ -1,0 +1,100 @@
+# kestra/flows/bimbam_support_agent.yaml
+# -----------------------------------------------------------------------------
+# Agente autónomo (agentic RAG, módulo 01-agentic-rag de llm-zoomcamp) para
+# el soporte de BimBam Buy.
+#
+# A diferencia de un pipeline RAG fijo (pregunta -> retrieval -> generación,
+# siempre en ese orden), acá el LLM decide:
+#   - si hace falta consultar la base de conocimiento interna (tool
+#     `call_bimbam_rag`, ver call_bimbam_rag_tool.yaml),
+#   - si el resultado alcanza o hace falta además una búsqueda web
+#     (tool `TavilyWebSearch`) para preguntas fuera de la documentación
+#     interna,
+#   - y puede iterar (buscar -> evaluar -> volver a buscar) antes de dar la
+#     respuesta final.
+#
+# Requiere los secrets en Kestra: GEMINI_API_KEY, TAVILY_API_KEY,
+# BIMBAM_API_URL (ver call_bimbam_rag_tool.yaml).
+#
+# Nota: los nombres exactos de propiedades del plugin io.kestra.plugin.ai.*
+# (por ejemplo las claves dentro de `tools` para KestraFlow) pueden variar
+# según la versión de Kestra — verificalos contra la documentación de tu
+# instalación antes de correr esto en producción.
+# -----------------------------------------------------------------------------
+
+id: bimbam_support_agent
+namespace: bimbam.buy
+
+description: >
+  Agente de soporte de BimBam Buy con acceso a la base de conocimiento
+  interna (RAG) y, como fallback, a búsqueda web. Decide autónomamente
+  qué herramienta usar y cuándo.
+
+inputs:
+  - id: question
+    type: STRING
+    required: true
+  - id: session_id
+    type: STRING
+    required: false
+    description: Id de conversación, para memoria multi-turno.
+
+tasks:
+  - id: agent
+    type: io.kestra.plugin.ai.agent.AIAgent
+
+    systemMessage: |
+      Sos el agente de soporte de BimBam Buy, una tienda de e-commerce en
+      LATAM. Respondé siempre en español, con un tono cercano y profesional.
+
+      Tenés dos herramientas:
+
+      1. "call_bimbam_rag": consulta la base de conocimiento OFICIAL de
+         BimBam Buy (política de reembolsos, garantía, envíos, pagos y
+         programa de afiliados). USALA SIEMPRE PRIMERO para cualquier
+         pregunta de soporte al cliente.
+
+      2. Búsqueda web (Tavily): usala SOLO si "call_bimbam_rag" indica
+         explícitamente que no tiene esa información en su contexto, y la
+         pregunta es sobre algo genérico (ej. normativa general de
+         e-commerce, no una política específica de BimBam Buy). NUNCA
+         inventes una política interna de BimBam Buy a partir de un
+         resultado de búsqueda web.
+
+      Cuando uses la búsqueda web, aclará en la respuesta que es
+      información general y no una política oficial confirmada de
+      BimBam Buy, y sugerí contactar al soporte oficial para confirmarla.
+
+    prompt: "{{ inputs.question }}"
+
+    provider:
+      type: io.kestra.plugin.ai.provider.GoogleGemini
+      modelName: gemini-2.5-flash
+      apiKey: "{{ secret('GEMINI_API_KEY') }}"
+      # Alternativas (ver "Agent Tools" en la doc de Kestra AI):
+      #   io.kestra.plugin.ai.provider.OpenAI
+      #   io.kestra.plugin.ai.provider.Anthropic
+
+    tools:
+      - type: io.kestra.plugin.ai.tool.KestraFlow
+        namespace: bimbam.buy
+        flowId: call_bimbam_rag
+        description: >
+          Consulta la base de conocimiento oficial de BimBam Buy (RAG
+          interno con hybrid search + reranking). Inputs: question (string,
+          obligatorio), session_id (string, opcional).
+      - type: io.kestra.plugin.ai.tool.TavilyWebSearch
+        apiKey: "{{ secret('TAVILY_API_KEY') }}"
+
+    memory:
+      type: io.kestra.plugin.ai.memory.KestraKVStore
+      memoryId: "bimbam_support_{{ inputs.session_id ?? execution.id }}"
+
+    configuration:
+      logRequests: true
+      logResponses: true
+
+outputs:
+  - id: answer
+    type: STRING
+    value: "{{ outputs.agent.textOutput }}"

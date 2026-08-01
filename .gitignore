@@ -1,4 +1,23 @@
-.env.example
+# Entornos virtuales de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Bases de datos locales y datos generados
+chroma_db/
+monitoring_data/
+
+# Historiales y cachés de herramientas (Aider)
+.aider.tags.cache.v4
+.aider.chat.history.md
+.aider.input.history
+historial_sesion_rag.md
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
+.aider*
+.env.example
+.env
+models/
+
+.bruin.yml

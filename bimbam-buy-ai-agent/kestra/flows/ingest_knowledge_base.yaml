@@ -1,0 +1,42 @@
+# kestra/flows/ingest_knowledge_base.yaml
+# -----------------------------------------------------------------------------
+# Orquestación de la (re)indexación de la base de conocimiento
+# (módulo 03-orchestration de llm-zoomcamp).
+#
+# Antes: reconstruir el índice era un paso manual (`python rag_engine.py`).
+# Con esto, la responsabilidad de "cuándo reindexar" pasa a Kestra:
+#   - Todos los días a las 3am (por si se actualizó algún PDF en `data/`)
+#   - Bajo demanda, pegándole a la URL del webhook (por ejemplo desde un
+#     pipeline de CI/CD que sube documentos nuevos)
+#
+# Requiere el secret BIMBAM_API_URL (ej: http://api:8000) y
+# BIMBAM_REINDEX_WEBHOOK_KEY (clave del webhook).
+# -----------------------------------------------------------------------------
+
+id: ingest_knowledge_base
+namespace: bimbam.buy
+
+description: >
+  Reconstruye el índice (vector store + BM25) de la base de conocimiento de
+  BimBam Buy llamando a POST /admin/reindex de la API.
+
+tasks:
+  - id: reindex
+    type: io.kestra.plugin.core.http.Request
+    uri: "{{ secret('BIMBAM_API_URL') }}/admin/reindex"
+    method: POST
+    options:
+      readTimeout: PT180S   # la reconstrucción del índice puede tardar
+
+  - id: log_result
+    type: io.kestra.plugin.core.log.Log
+    message: "Reindexado de BimBam Buy completado: {{ outputs.reindex.body }}"
+
+triggers:
+  - id: daily_schedule
+    type: io.kestra.plugin.core.trigger.Schedule
+    cron: "0 3 * * *"   # todos los días a las 3am
+
+  - id: on_demand
+    type: io.kestra.plugin.core.trigger.Webhook
+    key: "{{ secret('BIMBAM_REINDEX_WEBHOOK_KEY') }}"

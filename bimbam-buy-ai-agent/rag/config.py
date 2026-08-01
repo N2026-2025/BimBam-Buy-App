@@ -40,6 +40,14 @@ LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 EMBEDDINGS_PROVIDER = os.getenv("EMBEDDINGS_PROVIDER", LLM_PROVIDER).lower()
 EMBEDDINGS_MODEL = os.getenv("EMBEDDINGS_MODEL", "text-embedding-3-small")
 
+# --- Embeddings locales (ONNX, sin API externa) -------------------------------
+# Usados cuando EMBEDDINGS_PROVIDER=local. Ver rag/embeddings_local.py y
+# rag/local_embeddings/ (download.py + embedder.py).
+LOCAL_EMBEDDINGS_MODEL_REPO = os.getenv("LOCAL_EMBEDDINGS_MODEL_REPO", "Xenova/all-MiniLM-L6-v2")
+LOCAL_EMBEDDINGS_MODEL_PATH = Path(
+    os.getenv("LOCAL_EMBEDDINGS_MODEL_PATH", BASE_DIR / "models" / LOCAL_EMBEDDINGS_MODEL_REPO)
+)
+
 # Modelo de reranking (cross-encoder multilingüe, funciona bien en español)
 RERANKER_MODEL = os.getenv(
     "RERANKER_MODEL", "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
