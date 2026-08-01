@@ -22,10 +22,10 @@ class Embedder:
         )
         self.input_names = {inp.name for inp in self.session.get_inputs()}
 
-    def encode(self, text, normalize=True):
-        return self.encode_batch([text], normalize=normalize)[0]
+    def encode(self, text: str) -> list[float]:
+        return self.encode_batch([text])[0]
 
-    def encode_batch(self, texts, normalize=True):
+    def encode_batch(self, texts: list[str]) -> list[list[float]]:
         self.tokenizer.enable_padding()
         encoded = self.tokenizer.encode_batch(texts)
         feed = {}
@@ -42,6 +42,8 @@ class Embedder:
         hidden = self.session.run(None, feed)[0]
         mask = feed["attention_mask"][..., None]
         pooled = (hidden * mask).sum(axis=1) / mask.sum(axis=1)
-        if normalize:
-            pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
-        return pooled
+        
+        # Normalización
+        pooled = pooled / np.linalg.norm(pooled, axis=1, keepdims=True)
+        
+        return pooled.tolist()
