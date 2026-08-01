@@ -33,9 +33,15 @@ def retrieve(state: AgentState):
 # Paso 3: Nodo 'generate'
 def generate(state: AgentState):
     """Genera la respuesta usando el LLM y el contexto recuperado."""
-    # Usamos el LLM del pipeline para redactar la respuesta
+    # Usamos el LLM del pipeline para redactar la respuesta con un tono más casual
+    system_prompt = (
+        "Sos un asistente de soporte amable y casual de BimBam Buy. "
+        "Respondé de forma cercana y servicial usando únicamente el contexto proporcionado. "
+        "Si no sabés la respuesta, decilo con buena onda."
+    )
+    
     response = pipeline.llm.invoke(
-        f"Contexto: {state['documents']}\n\nPregunta: {state['question']}"
+        f"{system_prompt}\n\nContexto: {state['documents']}\n\nPregunta: {state['question']}"
     )
     
     return {
