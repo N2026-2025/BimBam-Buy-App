@@ -52,9 +52,24 @@ if question:
 
     with st.chat_message("assistant"):
         with st.spinner("Buscando en la documentación..."):
-            result = answer_question(question, session_id=st.session_state.session_id, pipeline=pipeline)
+            state = answer_question(question, session_id=st.session_state.session_id, pipeline=pipeline)
+        
+        raw_answer = state.get("answer", "No pude generar una respuesta.")
+        if isinstance(raw_answer, list) and len(raw_answer) > 0:
+            final_answer = raw_answer[0].get("text", str(raw_answer[0]))
+        else:
+            final_answer = str(raw_answer)
+
+        result = {
+            "answer": final_answer,
+            "standalone_question": state.get("standalone_question", question),
+            "sources": ", ".join([doc.metadata.get("source", "Desconocido") for doc in state.get("documents", [])]),
+            "timings_ms": state.get("timings_ms", {}),
+            "retrieved_chunks": [doc.page_content for doc in state.get("documents", [])]
+        }
+
         st.markdown(result["answer"])
-        st.caption(f"📄 Fuentes: {', '.join(result['sources'])}")
+        st.caption(f"📄 Fuentes: {result['sources']}")
         with st.expander("Detalle técnico (retrieval, timings)"):
             st.json(result["timings_ms"])
             st.write("Pregunta reformulada:", result["standalone_question"])
