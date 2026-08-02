@@ -12,6 +12,10 @@ Ejecutar:
 
 import streamlit as st
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).resolve().parent))
+
 from rag.pipeline import get_pipeline
 from rag.memory import new_session_id
 from monitoring.logging_db import log_interaction, save_feedback
