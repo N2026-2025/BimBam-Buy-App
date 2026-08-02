@@ -19,6 +19,7 @@ sys.path.append(str(Path(__file__).resolve().parent))
 
 # Aseguramos que la API Key de Gemini esté disponible
 os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+os.environ["LLM_MODEL"] = "gemini-3.1-flash-lite"
 
 from rag.pipeline import get_pipeline
 from rag.memory import new_session_id
