@@ -80,7 +80,10 @@ if question:
         }
 
         st.markdown(result["answer"])
-        st.caption(f"📄 Fuentes: {result['sources']}")
+        # Limpiamos espacios, eliminamos duplicados con set y ordenamos alfabéticamente
+        raw_sources = [s.strip() for s in result["sources"].split(",") if s.strip()]
+        unique_sources = ", ".join(sorted(list(set(raw_sources))))
+        st.caption(f"📄 Fuentes: {unique_sources}")
         with st.expander("Detalle técnico (retrieval, timings)"):
             st.json(result["timings_ms"])
             st.write("Pregunta reformulada:", result["standalone_question"])
