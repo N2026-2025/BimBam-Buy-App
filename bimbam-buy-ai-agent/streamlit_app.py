@@ -14,7 +14,6 @@ import streamlit as st
 
 from rag.pipeline import get_pipeline
 from rag.memory import new_session_id
-from rag_engine import answer_question
 from monitoring.logging_db import log_interaction, save_feedback
 
 st.set_page_config(page_title="BimBam Buy · Soporte AI", page_icon="🤖")
@@ -52,11 +51,14 @@ if question:
 
     with st.chat_message("assistant"):
         with st.spinner("Buscando en la documentación..."):
-            state = answer_question(question, session_id=st.session_state.session_id, pipeline=pipeline)
+            from rag.graph import graph
+            state = graph.invoke({"question": question, "session_id": st.session_state.session_id})
         
         raw_answer = state.get("answer", "No pude generar una respuesta.")
         if isinstance(raw_answer, list) and len(raw_answer) > 0:
-            final_answer = raw_answer[0].get("text", str(raw_answer[0]))
+            # Buscamos el texto si viene estructurado como lista de diccionarios
+            first_elem = raw_answer[0]
+            final_answer = first_elem.get("text", str(first_elem)) if isinstance(first_elem, dict) else str(first_elem)
         else:
             final_answer = str(raw_answer)
 
