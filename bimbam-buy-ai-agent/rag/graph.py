@@ -25,9 +25,9 @@ pipeline = get_pipeline()
 
 # Paso 2: Nodo 'retrieve'
 def retrieve(state: AgentState):
-    """Busca documentos relevantes usando el retriever del pipeline."""
-    docs = pipeline.retriever.get_relevant_documents(state["question"])
-    # Extraemos fuentes (asumiendo que están en metadata['source'])
+    """Busca documentos relevantes usando el retriever híbrido avanzado del pipeline."""
+    # Invocamos a nuestro hybrid_retriever usando get_candidates o el método de recuperación del RAG
+    docs = pipeline.hybrid_retriever.get_candidates(state["question"])
     sources = list(set([doc.metadata.get("source", "unknown") for doc in docs]))
     return {"documents": docs, "sources": sources}
 
