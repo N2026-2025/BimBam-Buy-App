@@ -1,0 +1,19 @@
+{
+    "timestamp": "2026-08-01 20:30:15",
+    "total_questions_tested": 2,
+    "successful_responses": 2,
+    "failed_responses": 0,
+    "average_latency_seconds": 1.15,
+    "details": [
+        {
+            "test_number": 1,
+            "category": "devoluciones",
+            "question": "¿Cuánto tiempo tengo para pedir un reembolso?",
+            "expected_answer": "El cliente tiene un plazo de 30 días corridos.",
+            "agent_response": "De acuerdo al manual de la empresa, tenés un plazo máximo de 30 días corridos para solicitarlo...",
+            "latency_seconds": 1.22,
+            "failed": false,
+            "error_message": ""
+        }
+    ]
+}
