@@ -70,3 +70,5 @@ def create_graph():
     workflow.add_edge("generate", END)
 
     return workflow.compile()
+
+graph = create_graph()
