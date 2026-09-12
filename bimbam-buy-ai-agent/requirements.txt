@@ -38,6 +38,6 @@ openai==1.58.1
 
 # --- Embeddings locales (ONNX, sin API externa) ---
 onnxruntime==1.20.1
-tokenizers==0.21.0
+tokenizers==0.20.3
 huggingface-hub==0.27.1
 

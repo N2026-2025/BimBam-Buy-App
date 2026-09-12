@@ -2,8 +2,7 @@
   "builds": [
     {
       "src": "app.py",
-      "use": "@vercel/python",
-      "config": { "requirementsTxt": "requirements-vercel.txt" }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -13,4 +12,5 @@
     }
   ]
 }
+
 
