@@ -1,0 +1,43 @@
+langchain==0.3.13
+langchain-chroma==1.1.0
+langchain-community==0.3.13
+langchain-text-splitters==0.3.4
+langchain-openai==0.2.14
+langchain-google-genai==2.0.7
+langchain-cohere==0.3.4
+chromadb==0.5.23
+pypdf==5.1.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+python-dotenv==1.0.1
+streamlit==1.41.1
+
+# --- Búsqueda híbrida + reranking ---
+rank-bm25==0.2.2
+sentence-transformers==3.3.1
+
+# --- OCR (documentos escaneados) ---
+pytesseract==0.3.13
+pdf2image==1.17.0
+
+# --- API: subida de archivos (audio) ---
+python-multipart==0.0.20
+
+# --- Monitoreo / observabilidad ---
+sqlalchemy==2.0.36
+prometheus-client==0.21.1
+psycopg2-binary==2.9.10   # driver de Postgres, usado si MONITORING_DB_URL apunta a Postgres
+
+# --- Evaluación ---
+numpy==2.2.1
+pandas==2.2.3
+
+# --- Voz (STT/TTS) ---
+openai==1.58.1
+
+# --- Embeddings locales (ONNX, sin API externa) ---
+onnxruntime==1.20.1
+tokenizers==0.20.3
+huggingface-hub==0.27.1
+
