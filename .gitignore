@@ -2,7 +2,7 @@
 .venv/
 __pycache__/
 *.pyc
-
+.widget.js
 # Bases de datos locales y datos generados
 chroma_db/
 monitoring_data/
@@ -19,5 +19,6 @@ historial_sesion_rag.md
 .env.example
 .env
 models/
+.gitignore
 
 .bruin.yml
