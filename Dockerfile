@@ -19,6 +19,9 @@ COPY . .
 # Hace importables rag, monitoring y voice desde la raíz de la app.
 ENV PYTHONPATH=/app/bimbam-buy-ai-agent
 
+# Descarga el modelo ONNX de embeddings locales durante el build.
+RUN python -m rag.local_embeddings.download
+
 EXPOSE 8000
 
 # Al iniciar el contenedor, se construye/carga el índice y se levanta la API.
