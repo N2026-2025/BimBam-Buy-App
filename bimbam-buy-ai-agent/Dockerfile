@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY . .
 
+# Descarga el modelo ONNX de embeddings locales durante el build.
+RUN python -m rag.local_embeddings.download
+
 EXPOSE 8000
 
 # Al iniciar el contenedor, se construye/carga el índice y se levanta la API.

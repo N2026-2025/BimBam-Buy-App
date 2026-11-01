@@ -17,7 +17,10 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- Datos y vector store ---------------------------------------------------
-DATA_DIR = Path(os.getenv("DATA_DIR", BASE_DIR / "data"))
+_data_dir = os.getenv("DATA_DIR", str(BASE_DIR / "data"))
+DATA_DIR = Path(_data_dir)
+if not DATA_DIR.is_absolute():
+    DATA_DIR = BASE_DIR / DATA_DIR
 PERSIST_DIR = Path(os.getenv("CHROMA_PERSIST_DIR", BASE_DIR / "chroma_db"))
 COLLECTION_NAME = os.getenv("CHROMA_COLLECTION", "bimbam_buy_kb")
 
