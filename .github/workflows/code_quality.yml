@@ -22,14 +22,14 @@ jobs:
       - name: Validar conflictos de dependencias (pip check)
         run: |
           if [ -f bimbam-buy-ai-agent/requirements.txt ]; then
-            pip install -r bimbam-buy-ai-agent/requirements.txt
+            pip install --upgrade -r bimbam-buy-ai-agent/requirements.txt
             pip check
           fi
 
       - name: Validar resolución de dependencias (dry-run)
         run: |
           if [ -f bimbam-buy-ai-agent/requirements.txt ]; then
-            pip install -r bimbam-buy-ai-agent/requirements.txt --dry-run
+            pip install --upgrade -r bimbam-buy-ai-agent/requirements.txt --dry-run
           fi
 
       - name: Revisar estilo y sintaxis (Ruff)

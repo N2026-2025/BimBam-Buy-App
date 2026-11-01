@@ -20,7 +20,7 @@ jobs:
       - name: Instalar dependencias de Python
         run: |
           cd bimbam-buy-ai-agent
-          pip install -r requirements.txt
+          pip install --upgrade -r requirements.txt
           pip install playwright pytest pytest-playwright
 
       - name: Validar conflictos de dependencias (pip check)
@@ -31,7 +31,7 @@ jobs:
       - name: Validar resolución de dependencias (dry-run)
         run: |
           cd bimbam-buy-ai-agent
-          pip install -r requirements.txt --dry-run
+          pip install --upgrade -r requirements.txt --dry-run
 
       - name: Instalar navegador Chromium y dependencias de sistema
         run: |
