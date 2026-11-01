@@ -1,0 +1,40 @@
+name: CI - Pruebas E2E (Streamlit)
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  playwright-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: |
+          cd bimbam-buy-ai-agent
+          pip install -r requirements.txt
+          pip install playwright pytest
+          playwright install chromium
+
+      - name: Levantar Streamlit en segundo plano
+        run: |
+          cd bimbam-buy-ai-agent
+          nohup streamlit run streamlit_app.py --server.port 8501 &
+          sleep 5 # Esperar a que el servidor web encienda
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      - name: Ejecutar Tests E2E con Playwright
+        run: |
+          cd bimbam-buy-ai-agent
+          pytest tests/test_interfaz_e2e.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

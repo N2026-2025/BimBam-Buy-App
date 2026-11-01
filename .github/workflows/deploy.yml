@@ -1,0 +1,12 @@
+name: CD - Desplegar a Render
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar el Webhook de Render
+        run: |
+          curl -f "${{ secrets.RENDER_DEPLOY_WEBHOOK }}"

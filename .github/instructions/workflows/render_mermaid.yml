@@ -1,0 +1,28 @@
+# .github/workflows/render-md-mermaid.yml
+name: render-md-mermaid
+
+# El flujo se activa de forma automática cada vez que hacés un 'git push' que cambie algún archivo Markdown (.md)
+on:
+  push:
+    paths:
+      - '**.md'
+
+jobs:
+  render-md-mermaid:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descarga el código de tu repositorio en el servidor de GitHub
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Busca los bloques ```mermaid dentro de tus archivos .md y genera los gráficos ocultando el código crudo
+      - name: Render images for every Mermaid diagram
+        uses: nielsvaneck/render-md-mermaid@v3
+
+      # 3. Hace un commit y un push automático con los archivos .png o .svg generados para que se vean en GitHub
+      - name: Commit rendered png and svg files
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          file_pattern: "*[.svg,.png]"
+          commit_message: "chore: renderizado automático de diagramas Mermaid"

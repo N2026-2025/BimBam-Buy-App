@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # Main Architecture Review Service
+  architecture-review:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: bimbam-architecture-review
+    restart: unless-stopped
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - DOCUMENTS_PATH=/app/documents
+      - OUTPUT_PATH=/app/reports
+      - CACHE_DIR=/app/cache
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_KEY_ENABLED=false
+      # Optional: External integrations
+      # - GITHUB_TOKEN=${GITHUB_TOKEN}
+      # - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+    volumes:
+      - ./documents:/app/documents:ro
+      - ./reports:/app/reports
+      - ./cache:/app/cache
+      - ./config:/app/config:ro
+      - ./templates:/app/templates:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - bimbam-network
+
+  # API Documentation (Swagger UI)
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: bimbam-swagger-ui
+    restart: unless-stopped
+    environment:
+      - API_URL=http://architecture-review:8000/openapi.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - architecture-review
+    networks:
+      - bimbam-network
+
+  # Optional: Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: bimbam-redis
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - bimbam-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: PostgreSQL for persistent storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: bimbam-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=bimbam_review
+      - POSTGRES_USER=review_user
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - bimbam-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U review_user -d bimbam_review"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bimbam-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - bimbam-network
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bimbam-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - bimbam-network
+
+volumes:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  bimbam-network:
+    driver: bridge

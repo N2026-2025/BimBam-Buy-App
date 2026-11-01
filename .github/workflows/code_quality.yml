@@ -1,0 +1,36 @@
+name: CI - Calidad de Código y Seguridad
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar herramientas de análisis
+        run: |
+          pip install ruff bandit safety
+
+      - name: Revisar estilo y sintaxis (Ruff)
+        run: |
+          ruff check bimbam-buy-ai-agent/
+
+      - name: Escaneo de Seguridad en Código (Bandit)
+        run: |
+          # Revisa que no haya contraseñas hardcodeadas o funciones peligrosas
+          bandit -r bimbam-buy-ai-agent/ -x **/tests/**
+
+      - name: Escaneo de Vulnerabilidades en Dependencias (Safety)
+        run: |
+          # Revisa si tus librerías de requirements.txt tienen fallas de seguridad conocidas
+          if [ -f bimbam-buy-ai-agent/requirements.txt ]; then
+            safety check -r bimbam-buy-ai-agent/requirements.txt || echo "⚠️ Se encontraron algunas advertencias en dependencias."
+          fi

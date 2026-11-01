@@ -18,6 +18,7 @@ historial_sesion_rag.md
 .aider*
 .env.example
 .env
+.env.test
 models/
 .gitignore
 

@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Architecture Review: {{ system.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            background: #f8f9fa; 
+            margin: 0; 
+            padding: 20px;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 40px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+        }
+        header { 
+            border-bottom: 3px solid #2563eb; 
+            padding-bottom: 20px; 
+            margin-bottom: 30px; 
+        }
+        h1 { 
+            color: #1e293b; 
+            font-size: 2.5rem; 
+            margin-bottom: 10px; 
+        }
+        .meta { 
+            color: #64748b; 
+            font-size: 1.1rem; 
+        }
+        .meta-item { 
+            display: inline-block; 
+            margin-right: 20px; 
+            padding: 5px 0; 
+        }
+        .meta-label { 
+            font-weight: 600; 
+            color: #475569; 
+        }
+        
+        /* Metrics Grid */
+        .metrics-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 20px; 
+            margin: 30px 0; 
+        }
+        .metric-card { 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+            padding: 25px; 
+            border-radius: 10px; 
+            text-align: center; 
+            border: 1px solid #e2e8f0;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .metric-card:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
+        }
+        .metric-value { 
+            font-size: 3rem; 
+            font-weight: 700; 
+            color: #2563eb; 
+            line-height: 1; 
+            margin-bottom: 8px; 
+        }
+        .metric-label { 
+            color: #64748b; 
+            font-size: 0.95rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        .metric-critical { color: #dc2626; }
+        .metric-high { color: #ea580c; }
+        .metric-medium { color: #ca8a04; }
+        .metric-low { color: #16a34a; }
+        
+        /* Sections */
+        section { 
+            margin: 40px 0; 
+        }
+        h2 { 
+            color: #1e293b; 
+            font-size: 1.75rem; 
+            margin-bottom: 20px; 
+            padding-bottom: 10px; 
+            border-bottom: 2px solid #e2e8f0; 
+        }
+        h3 { 
+            color: #334155; 
+            font-size: 1.25rem; 
+            margin: 20px 0 12px; 
+        }
+        h4 { 
+            color: #475569; 
+            font-size: 1.1rem; 
+            margin: 16px 0 8px; 
+        }
+        
+        /* Gap Cards */
+        .gap { 
+            background: #fafafa; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 16px 0; 
+            border-left: 4px solid; 
+            transition: all 0.2s; 
+        }
+        .gap:hover { 
+            background: #f8fafc; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
+        }
+        .gap.critical { border-color: #dc2626; background: #fef2f2; }
+        .gap.high { border-color: #ea580c; background: #fff7ed; }
+        .gap.medium { border-color: #ca8a04; background: #fefce8; }
+        .gap.low { border-color: #16a34a; background: #f0fdf4; }
+        
+        .gap-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: flex-start; 
+            margin-bottom: 12px; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+        }
+        .gap-title { 
+            font-size: 1.1rem; 
+            font-weight: 600; 
+            color: #1e293b; 
+            margin: 0; 
+        }
+        .severity-badge { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            border-radius: 20px; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        .severity-critical { background: #fee2e2; color: #dc2626; }
+        .severity-high { background: #ffedd5; color: #ea580c; }
+        .severity-medium { background: #fef9c3; color: #ca8a04; }
+        .severity-low { background: #dcfce7; color: #16a34a; }
+        
+        .gap-meta { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 12px; 
+            margin: 16px 0; 
+            font-size: 0.9rem; 
+        }
+        .meta-field { 
+            background: white; 
+            padding: 10px 12px; 
+            border-radius: 6px; 
+            border: 1px solid #e2e8f0; 
+        }
+        .meta-field-label { 
+            font-size: 0.75rem; 
+            color: #64748b; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+            margin-bottom: 4px; 
+        }
+        .meta-field-value { 
+            color: #334155; 
+            font-weight: 500; 
+        }
+        
+        .gap-description { 
+            color: #475569; 
+            line-height: 1.7; 
+        }
+        .gap-states { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 16px; 
+            margin-top: 16px; 
+        }
+        .state-box { 
+            padding: 14px; 
+            border-radius: 8px; 
+            font-size: 0.9rem; 
+        }
+        .current-state { 
+            background: #fef2f2; 
+            border: 1px solid #fecaca; 
+            color: #991b1b; 
+        }
+        .expected-state { 
+            background: #f0fdf4; 
+            border: 1px solid #bbf7d0; 
+            color: #166534; 
+        }
+        .state-label { 
+            font-weight: 600; 
+            margin-bottom: 6px; 
+            font-size: 0.8rem; 
+            text-transform: uppercase; 
+            letter-spacing: 0.5px; 
+        }
+        
+        /* Recommendation Cards */
+        .recommendation { 
+            background: #eff6ff; 
+            border-radius: 8px; 
+            padding: 20px; 
+            margin: 16px 0; 
+            border-left: 4px solid #2563eb; 
+        }
+        .rec-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 12px; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+        }
+        .rec-title { 
+            font-size: 1.1rem; 
+            font-weight: 600; 
+            color: #1e40af; 
+            margin: 0; 
+        }
+        .priority-badge { 
+            background: #dbeafe; 
+            color: #1e40af; 
+            padding: 4px 10px; 
+            border-radius: 16px; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+        }
+        .effort-badge { 
+            background: #fef3c7; 
+            color: #92400e; 
+            padding: 4px 10px; 
+            border-radius: 16px; 
+            font-size: 0.75rem; 
+            font-weight: 600; 
+        }
+        
+        /* Technology Stack */
+        .tech-stack { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 8px; 
+            margin: 16px 0; 
+        }
+        .tech-tag { 
+            background: #f1f5f9; 
+            color: #475569; 
+            padding: 6px 14px; 
+            border-radius: 20px; 
+            font-size: 0.85rem; 
+            font-weight: 500; 
+            border: 1px solid #e2e8f0; 
+            transition: all 0.2s; 
+        }
+        .tech-tag:hover { 
+            background: #e2e8f0; 
+            transform: translateY(-1px); 
+        }
+        
+        /* Tables */
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0; 
+        }
+        th, td { 
+            padding: 12px 16px; 
+            text-align: left; 
+            border-bottom: 1px solid #e2e8f0; 
+        }
+        th { 
+            background: #f8fafc; 
+            font-weight: 600; 
+            color: #334155; 
+            font-size: 0.9rem; 
+        }
+        tr:hover td { 
+            background: #f8fafc; 
+        }
+        
+        /* Footer */
+        footer { 
+            margin-top: 50px; 
+            padding-top: 30px; 
+            border-top: 2px solid #e2e8f0; 
+            text-align: center; 
+            color: #64748b; 
+            font-size: 0.9rem; 
+        }
+        .footer-links { 
+            margin-top: 16px; 
+        }
+        .footer-links a { 
+            color: #2563eb; 
+            text-decoration: none; 
+            margin: 0 10px; 
+        }
+        .footer-links a:hover { 
+            text-decoration: underline; 
+        }
+        
+        /* Print Styles */
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; padding: 0; max-width: none; }
+            .gap, .recommendation { break-inside: avoid; }
+            .metric-card { break-inside: avoid; }
+        }
+        
+        /* Dark Mode Support */
+        @media (prefers-color-scheme: dark) {
+            body { background: #0f172a; color: #e2e8f0; }
+            .container { background: #1e293b; }
+            .gap { background: #1e293b; }
+            .gap.critical { background: #450a0a; }
+            .gap.high { background: #451a03; }
+            .gap.medium { background: #422006; }
+            .gap.low { background: #052e16; }
+            .recommendation { background: #1e3a5f; }
+            .metric-card { background: #1e293b; border-color: #334155; }
+            .meta-field { background: #0f172a; border-color: #334155; }
+            .state-box.current-state { background: #450a0a; border-color: #dc2626; color: #fca5a5; }
+            .state-box.expected-state { background: #052e16; border-color: #16a34a; color: #86efac; }
+            .tech-tag { background: #334155; color: #cbd5e1; border-color: #475569; }
+            .rec-header { color: #bfdbfe; }
+            table th { background: #1e293b; }
+            tr:hover td { background: #1e293b; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Architecture Review: {{ system.name }}</h1>
+            <div class="meta">
+                <span class="meta-item"><span class="meta-label">Version:</span> {{ system.version }}</span>
+                <span class="meta-item"><span class="meta-label">Date:</span> {{ analysis_date.strftime('%B %d, %Y') }}</span>
+                <span class="meta-item"><span class="meta-label">Duration:</span> {{ "%.1f"|format(duration) }}s</span>
+                <span class="meta-item"><span class="meta-label">Status:</span> {{ result.status.value | title }}</span>
+            </div>
+        </header>
+        
+        <!-- Executive Summary -->
+        <section>
+            <h2>📊 Executive Summary</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{{ "%.1f"|format(metrics.alignment_score) }}%</div>
+                    <div class="metric-label">Alignment Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ metrics.total_gaps }}</div>
+                    <div class="metric-label">Total Gaps</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value metric-critical">{{ metrics.critical_gaps }}</div>
+                    <div class="metric-label">Critical</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value metric-high">{{ metrics.high_gaps }}</div>
+                    <div class="metric-label">High</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value metric-medium">{{ metrics.medium_gaps }}</div>
+                    <div class="metric-label">Medium</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value metric-low">{{ metrics.low_gaps }}</div>
+                    <div class="metric-label">Low</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ metrics.recommendations_generated }}</div>
+                    <div class="metric-label">Recommendations</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{{ metrics.documents_processed }}</div>
+                    <div class="metric-label">Documents</div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Gap Analysis -->
+        <section>
+            <h2>🔍 Gap Analysis</h2>
+            {% for severity in [GapSeverity.CRITICAL, GapSeverity.HIGH, GapSeverity.MEDIUM, GapSeverity.LOW] %}
+                {% set severity_gaps = result.gaps | selectattr('severity', 'equalto', severity) | list %}
+                {% if severity_gaps %}
+                    <h3>{{ severity.value.upper }} Gaps ({{ severity_gaps|length }})</h3>
+                    {% for gap in severity_gaps %}
+                        <div class="gap {{ severity.value }}">
+                            <div class="gap-header">
+                                <h4 class="gap-title">{{ gap.title }}</h4>
+                                <span class="severity-badge severity-{{ severity.value }}">{{ severity.value.upper }}</span>
+                            </div>
+                            <div class="gap-meta">
+                                <div class="meta-field">
+                                    <div class="meta-field-label">Category</div>
+                                    <div class="meta-field-value">{{ gap.category.value | title }}</div>
+                                </div>
+                                <div class="meta-field">
+                                    <div class="meta-field-label">Effort</div>
+                                    <div class="meta-field-value">{{ gap.effort_estimate | title }}</div>
+                                </div>
+                                <div class="meta-field">
+                                    <div class="meta-field-label">Risk Score</div>
+                                    <div class="meta-field-value">{{ "%.0f"|format(gap.metadata.get('risk_score', 0) if gap.metadata else 0) }}/100</div>
+                                </div>
+                            </div>
+                            <div class="gap-description">{{ gap.description }}</div>
+                            <div class="gap-states">
+                                <div class="state-box current-state">
+                                    <div class="state-label">Current State</div>
+                                    {{ gap.current_state }}
+                                </div>
+                                <div class="state-box expected-state">
+                                    <div class="state-label">Expected State</div>
+                                    {{ gap.expected_state }}
+                                </div>
+                            </div>
+                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 0.9rem;">
+                                <strong>Impact:</strong> {{ gap.impact }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
+        </section>
+        
+        <!-- Recommendations -->
+        {% if result.recommendations %}
+        <section>
+            <h2>🎯 Recommendations</h2>
+            {% for rec in result.recommendations | sort(attribute='priority', reverse=true) %}
+                <div class="recommendation">
+                    <div class="rec-header">
+                        <h4 class="rec-title">{{ rec.title }}</h4>
+                        <div>
+                            <span class="priority-badge">Priority: {{ rec.priority }}/10</span>
+                            <span class="effort-badge" style="margin-left: 8px;">{{ rec.effort | replace('-', ' ') | title }}</span>
+                        </div>
+                    </div>
+                    <p style="color: #334155; line-height: 1.7; margin-bottom: 16px;">{{ rec.description }}</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.9rem; color: #475569;">
+                        <div><strong>Timeline:</strong> {{ rec.estimated_timeline }}</div>
+                        <div><strong>Risk:</strong> <span style="text-transform: capitalize;">{{ rec.risk_level.value }}</span></div>
+                        {% if rec.resources %}
+                        <div><strong>Resources:</strong> {{ rec.resources | join(', ') }}</div>
+                        {% endif %}
+                    </div>
+                    {% if rec.success_criteria %}
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #bfdbfe;">
+                        <strong style="color: #1e40af;">Success Criteria:</strong>
+                        <ul style="margin: 8px 0 0 20px; color: #334155;">
+                            {% for criterion in rec.success_criteria %}
+                                <li>{{ criterion }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        
+        <!-- Technology Stack -->
+        <section>
+            <h2>🛠️ Technology Stack</h2>
+            <div class="tech-stack">
+                {% for tech in system.technologies | sort %}
+                    <span class="tech-tag">{{ tech }}</span>
+                {% endfor %}
+            </div>
+        </section>
+        
+        <!-- System Components -->
+        {% if system.components %}
+        <section>
+            <h2>🏗️ System Components</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Type</th>
+                        <th>File</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for comp in system.components %}
+                    <tr>
+                        <td>{{ comp.get('name', 'Unknown') }}</td>
+                        <td><span class="tech-tag">{{ comp.get('type', 'unknown') }}</span></td>
+                        <td><code style="font-size: 0.85rem;">{{ comp.get('file', 'N/A') }}</code></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+        
+        <!-- Data Flows -->
+        {% if system.data_flows %}
+        <section>
+            <h2>🔄 Data Flows</h2>
+            {% for flow in system.data_flows %}
+            <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 16px 0; border: 1px solid #e2e8f0;">
+                <h4 style="color: #2563eb; margin-bottom: 12px;">{{ flow.name }}</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; font-size: 0.9rem;">
+                    <div><strong>Source:</strong> {{ flow.source }}</div>
+                    <div><strong>Destination:</strong> {{ flow.destination }}</div>
+                    <div style="grid-column: 1/-1;"><strong>Transformation:</strong> {{ flow.transformation }}</div>
+                    <div><strong>Components:</strong> {{ flow.components | join(', ') }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+        
+        <footer>
+            <p><strong>BimBam Architecture Review</strong> - Comprehensive Architecture Analysis</p>
+            <p>Generated on {{ generated_at.strftime('%B %d, %Y at %H:%M:%S') }}</p>
+            <div class="footer-links">
+                <a href="https://github.com/bimbam-buy/architecture-review">Documentation</a>
+                <a href="https://github.com/bimbam-buy/architecture-review/issues">Report Issues</a>
+                <a href="mailto:team@bimbam-buy.com">Contact Support</a>
+            </div>
+            <p style="margin-top: 20px; font-size: 0.8rem; color: #94a3b8;">
+                BimBam Architecture Review v1.0.0 | Built for BimBam Buy AI Agent
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

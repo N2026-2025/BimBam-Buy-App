@@ -1,0 +1,37 @@
+# Dependencias para testing LLM BimBam Buy
+
+# Testing Framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-mock>=3.10.0
+pytest-timeout>=2.0.0
+pytest-performance>=1.0.0
+
+# HTTP and API Testing
+httpx>=0.24.0
+playwright>=1.40.0
+
+# Database and Testing Infrastructure
+psycopg2-binary>=2.9.9
+pytest-postgresql>=4.1.0
+
+# Container Testing
+testcontainers>=4.8.0
+
+# Monitoring and Metrics
+prometheus-client>=0.17.0
+
+# Configuration and Environment
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+
+# Development and Debugging
+ipdb>=0.13.13
+
+# Extra dependencies para testing avanzado
+redis>=5.0.1
+pytest-redis>=2.0.0
+
+# Testing of LLM providers (usar con mock cuando no haya API keys)
+mock>=4.0.0
+freezegun>=1.5.0

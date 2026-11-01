@@ -1,38 +1,75 @@
 version: "3.9"
 
-# Stack principal (API + UI). Para sumar observabilidad completa
-# (Postgres + Prometheus + Grafana), correr junto con docker-compose.monitoring.yml:
-#   docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build
-# y setear en .env: MONITORING_DB_URL=postgresql+psycopg2://bimbam:bimbam@postgres:5432/bimbam_monitoring
+# Infraestructura maestra para testing de LLM BimBam Buy
+# Soporta Google Gemini, Cohere y ONNX local
+
+# Uso:
+#   docker compose -f docker-compose.test.yml up --build
+#   docker compose -f docker-compose.test.yml down
 
 services:
+  # API principal (exactamente como en producción)
   api:
     build: .
-    container_name: bimbam-buy-agent-api
+    container_name: bimbam-buy-llm-test-api
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - .env.test
     volumes:
       - ./data:/app/data
       - chroma_data:/app/chroma_db
-      - monitoring_data:/app/monitoring_data
-
-  ui:
-    build: .
-    container_name: bimbam-buy-agent-ui
-    command: ["streamlit", "run", "streamlit_app.py", "--server.address=0.0.0.0", "--server.port=8501"]
-    ports:
-      - "8501:8501"
-    env_file:
-      - .env
-    volumes:
-      - ./data:/app/data
-      - chroma_data:/app/chroma_db
-      - monitoring_data:/app/monitoring_data
     depends_on:
-      - api
+      - redis
+    networks:
+      - test_net
+
+  # Redis para testing multi-turno y sesiones
+  redis:
+    image: redis:7-alpine
+    container_name: bimbam-buy-llm-test-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - test_net
+
+  # PostgreSQL para logs de testing (para cumplimiento regulatorio)
+  postgres:
+    image: postgres:16-alpine
+    container_name: bimbam-buy-llm-test-postgres
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: bimbam_test
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/:/docker-entrypoint-initdb.d/
+    networks:
+      - test_net
+
+  # ChromaDB para testing de vector store
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: bimbam-buy-llm-test-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_test_data:/chroma
+    networks:
+      - test_net
 
 volumes:
   chroma_data:
-  monitoring_data:
+  chroma_test_data:
+  redis_data:
+  postgres_data:
+
+networks:
+  test_net:
+    driver: bridge

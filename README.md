@@ -1,6 +1,6 @@
-# BimBam Buy
+# BimBam Buy (Agente RAG con Soporte IA)
 
-E-commerce multiplataforma enfocado en la experiencia de compra digital ágil y segura. Se destaca por un modelo de negocio orientado al cliente, con políticas robustas de reembolso, un programa de afiliados dinámico y una infraestructura logística optimizada para garantizar entregas rápidas y soporte constante al usuário final.
+Multiplataforma E-commerce con enfoque en la experiencia de compra digital ágil y segura. Se destaca por un modelo de negocio orientado al cliente, con políticas robustas de reembolso, un programa de afiliados dinámico y una infraestructura logística optimizada para garantizar entregas rápidas y soporte constante al usuário final.
 
 # 🤖 BimBam Buy AI Support Agent
 
@@ -137,7 +137,7 @@ git clone https://github.com/<tu-usuario>/bimbam-buy-ai-agent.git
 cd bimbam-buy-ai-agent
 ```
 
-### 2. Configurá 
+### 2. Configurá
 
 ```bash
 cp .env.example .env
@@ -151,10 +151,11 @@ Paso 1: Crear la carpeta e inicializar el proyecto
 Crea el directorio para tu reto e inicializa un entorno de Python ultra rápido usando `uv`:
 
 bash
-
 ```
+
 mkdir bimbam buy-onnx && cd bimbam buy-onnx
 uv init --no-workspace
+
 ```
 
 Usa el código con precaución.
@@ -166,8 +167,10 @@ Instala los paquetes necesarios para ejecutar ONNX, manejar los vectores con Num
 bash
 
 ```
+
 uv add onnxruntime tokenizers numpy google-genai
 uv add --dev huggingface-hub
+
 ```
 
 Usa el código con precaución.
@@ -179,6 +182,7 @@ Crea el archivo para descargar el modelo ONNX desde Hugging Face:
 bash
 
 ```
+
 cat << 'EOF' > download.py
 import os
 from huggingface_hub import hf_hub_download
@@ -193,6 +197,7 @@ for file in FILES:
     hf_hub_download(repo_id=MODEL_ID, filename=file, local_dir=dest_path, local_dir_use_symlinks=False)
 print("¡Descarga completada con éxito en /models!")
 EOF
+
 ```
 
 Usa el código con precaución.
@@ -200,9 +205,10 @@ Usa el código con precaución.
 Ahora ejecuta la descarga (esto solo se hace una vez):
 
 bash
-
 ```
+
 uv run python download.py
+
 ```
 
 Usa el código con precaución.
@@ -212,8 +218,8 @@ Paso 4: Crear la clase del Embedder ONNX
 Crea el archivo que procesará los textos y los convertirá en vectores usando únicamente la CPU:
 
 bash
-
 ```
+
 cat << 'EOF' > embedder.py
 import os
 import numpy as np
@@ -233,7 +239,7 @@ class Embedder:
         encodings = self.tokenizer.encode_batch(texts)
         input_ids = np.array([e.ids for e in encodings], dtype=np.int64)
         attention_mask = np.array([e.attention_mask for e in encodings], dtype=np.int64)
-  
+
         inputs = {"input_ids": input_ids, "attention_mask": attention_mask}
         model_inputs = [i.name for i in self.session.get_inputs()]
         if "token_type_ids" in model_inputs:
@@ -243,12 +249,13 @@ class Embedder:
         input_mask_expanded = np.expand_dims(attention_mask, axis=-1).astype(float)
         sum_embeddings = np.sum(outputs * input_mask_expanded, axis=1)
         sum_mask = np.clip(np.sum(input_mask_expanded, axis=1), a_min=1e-9, a_max=None)
-  
+
         return self._normalize(sum_embeddings / sum_mask)
 
     def encode(self, text):
         return self.encode_batch([text])[0]
 EOF
+
 ```
 
 Usa el código con precaución.
@@ -258,8 +265,8 @@ Paso 5: Crear el script del flujo RAG
 Crea el script de prueba que unirá tu base de datos vectorial local con Gemini:
 
 bash
-
 ```
+
 cat << 'EOF' > test_rag.py
 import os
 import numpy as np
@@ -292,10 +299,10 @@ def main():
     scores = np.dot(doc_vectors, query_vector)
     best_idx = np.argmax(scores)
     context = documents[best_idx]["text"]
-  
+
     print(f"🎯 Documento más relevante encontrado (Score: {scores[best_idx]:.4f}):\n   '{context}'")
     print("\n🚀 Enviando contexto y pregunta a Gemini...")
-  
+
     prompt = f"Responde la pregunta del usuario utilizando únicamente el contexto provisto.\n\nContexto:\n{context}\n\nPregunta:\n{query}\n\nRespuesta:"
 
     response = ai_client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
@@ -304,6 +311,7 @@ def main():
 if __name__ == "__main__":
     main()
 EOF
+
 ```
 
 Usa el código con precaución.
@@ -313,10 +321,11 @@ Paso 6: Configurar tu API Key y ejecutar
 Reemplaza `"TU_API_KEY_AQUI"` con tu clave real de Google AI Studio y ejecuta el pipeline completo:
 
 bash
-
 ```
+
 export GEMINI_API_KEY="TU_API_KEY_AQUI"
 uv run python test_rag.py
+
 ```
 
 Usa el código con precaución.

@@ -1,0 +1,407 @@
+# BimBam Architecture Review - GitHub Actions Workflow
+# Place this file at .github/workflows/architecture-review.yml
+
+name: BimBam Architecture Review
+
+on:
+  # Run on pushes to main branch affecting the AI agent
+  push:
+    branches: [main, develop]
+    paths:
+      - 'bimbam-buy-ai-agent/**'
+      - 'docs/**/*.pdf'
+      - '.github/workflows/architecture-review.yml'
+  
+  # Run on pull requests
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'bimbam-buy-ai-agent/**'
+      - 'docs/**/*.pdf'
+  
+  # Run weekly on Mondays at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * 1'
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      severity:
+        description: 'Minimum severity level to report'
+        required: false
+        default: 'high'
+        type: choice
+        options:
+          - critical
+          - high
+          - medium
+          - low
+      timeline_months:
+        description: 'Roadmap timeline in months'
+        required: false
+        default: '12'
+        type: string
+
+# Environment variables
+env:
+  PYTHON_VERSION: '3.11'
+  DOCUMENTS_PATH: './BimBam Buy docs'
+  SYSTEM_PATH: './bimbam-buy-ai-agent'
+  REPORTS_PATH: './architecture-reports'
+  CACHE_PATH: './.cache/architecture-review'
+
+jobs:
+  # Main architecture review job
+  architecture-review:
+    name: Architecture Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      actions: read
+    
+    steps:
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for comparison
+      
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      # Install system dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            poppler-utils \
+            tesseract-ocr \
+            libpq-dev
+      
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r bimbam_architecture_review/requirements.txt
+          # Install the package in development mode
+          pip install -e ./bimbam_architecture_review
+      
+      # Verify installation
+      - name: Verify installation
+        run: |
+          bimbam-architecture-review --version
+          bimbam-architecture-review config
+      
+      # Run architecture review
+      - name: Run Architecture Review
+        id: review
+        run: |
+          bimbam-architecture-review review \
+            --documents "${{ env.DOCUMENTS_PATH }}" \
+            --system-path "${{ env.SYSTEM_PATH }}" \
+            --output "${{ env.REPORTS_PATH }}" \
+            --format console \
+            --format json \
+            --format markdown \
+            --format html \
+            --severity critical \
+            --severity high \
+            --severity medium \
+            --parallel 4
+        continue-on-error: true  # Don't fail build on gaps, we'll handle manually
+      
+      # Upload reports as artifacts
+      - name: Upload Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-review-reports
+          path: ${{ env.REPORTS_PATH }}/
+          retention-days: 30
+      
+      # Generate summary for GitHub Actions
+      - name: Generate Summary
+        if: always()
+        run: |
+          REPORT_FILE=$(find ${{ env.REPORTS_PATH }} -name "*.json" | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            echo "## Architecture Review Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Extract metrics using jq
+            ALIGNMENT=$(jq -r '.metrics.alignment_score' "$REPORT_FILE")
+            TOTAL_GAPS=$(jq -r '.metrics.total_gaps' "$REPORT_FILE")
+            CRITICAL=$(jq -r '.metrics.critical_gaps' "$REPORT_FILE")
+            HIGH=$(jq -r '.metrics.high_gaps' "$REPORT_FILE")
+            MEDIUM=$(jq -r '.metrics.medium_gaps' "$REPORT_FILE")
+            LOW=$(jq -r '.metrics.low_gaps' "$REPORT_FILE")
+            RECS=$(jq -r '.metrics.recommendations_generated' "$REPORT_FILE")
+            
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Alignment Score | ${ALIGNMENT}% |" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Gaps | $TOTAL_GAPS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            echo "| High | $HIGH |" >> $GITHUB_STEP_SUMMARY
+            echo "| Medium | $MEDIUM |" >> $GITHUB_STEP_SUMMARY
+            echo "| Low | $LOW |" >> $GITHUB_STEP_SUMMARY
+            echo "| Recommendations | $RECS |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Add critical gaps details
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              echo "### ⚠️ Critical & High Severity Gaps" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              
+              jq -r '.gaps[] | select(.severity == "critical" or .severity == "high") | "- **\(.severity | upper)**: \(.title) - \(.description)"' "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Add top recommendations
+            echo "### 🎯 Top Recommendations" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '.recommendations[:5] | .[] | "- **\(.title)** (Priority: \(.priority), Effort: \(.effort))"' "$REPORT_FILE" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No report generated" >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      # Comment on PR with results
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const reportDir = '${{ env.REPORTS_PATH }}';
+            const files = fs.readdirSync(reportDir);
+            const jsonFile = files.find(f => f.endsWith('.json'));
+            
+            if (jsonFile) {
+              const report = JSON.parse(fs.readFileSync(path.join(reportDir, jsonFile), 'utf8'));
+              
+              let body = `## 🏗️ Architecture Review Results\n\n`;
+              body += `| Metric | Value |\n|--------|-------|\n`;
+              body += `| Alignment Score | ${report.metrics.alignment_score}% |\n`;
+              body += `| Total Gaps | ${report.metrics.total_gaps} |\n`;
+              body += `| Critical | ${report.metrics.critical_gaps} |\n`;
+              body += `| High | ${report.metrics.high_gaps} |\n`;
+              body += `| Medium | ${report.metrics.medium_gaps} |\n`;
+              body += `| Low | ${report.metrics.low_gaps} |\n`;
+              body += `| Recommendations | ${report.metrics.recommendations_generated} |\n\n`;
+              
+              if (report.metrics.critical_gaps > 0 || report.metrics.high_gaps > 0) {
+                body += `### ⚠️ Critical & High Gaps\n\n`;
+                const criticalHigh = report.gaps.filter(g => g.severity === 'critical' || g.severity === 'high');
+                criticalHigh.slice(0, 5).forEach(gap => {
+                  body += `- **${gap.severity.toUpperCase()}**: ${gap.title}\n`;
+                });
+                body += `\n`;
+              }
+              
+              body += `### 🎯 Top Recommendations\n\n`;
+              report.recommendations.slice(0, 5).forEach(rec => {
+                body += `- **${rec.title}** (Priority: ${rec.priority}, Effort: ${rec.effort})\n`;
+              });
+              
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Generate and upload roadmap
+  generate-roadmap:
+    name: Generate Implementation Roadmap
+    runs-on: ubuntu-latest
+    needs: architecture-review
+    if: always()
+    steps:
+      - name: Download Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: architecture-review-reports
+          path: ${{ env.REPORTS_PATH }}
+      
+      - name: Generate Roadmap
+        run: |
+          REPORT_FILE=$(find ${{ env.REPORTS_PATH }} -name "*.json" | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            # In a real implementation, this would call the roadmap generation
+            echo "Roadmap generation would run here"
+            echo "Timeline: 12 months"
+            echo "Phases: Quick Wins, Short-term, Long-term"
+          fi
+      
+      - name: Upload Roadmap
+        uses: actions/upload-artifact@v4
+        with:
+          name: implementation-roadmap
+          path: ${{ env.REPORTS_PATH }}/roadmap.*
+          retention-days: 90
+
+  # Notify on critical findings
+  notify-critical:
+    name: Notify Critical Findings
+    runs-on: ubuntu-latest
+    needs: architecture-review
+    if: always()
+    steps:
+      - name: Download Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: architecture-review-reports
+          path: ${{ env.REPORTS_PATH }}
+      
+      - name: Check for Critical Findings
+        id: check
+        run: |
+          REPORT_FILE=$(find ${{ env.REPORTS_PATH }} -name "*.json" | head -1)
+          if [ -f "$REPORT_FILE" ]; then
+            CRITICAL=$(jq -r '.metrics.critical_gaps' "$REPORT_FILE")
+            HIGH=$(jq -r '.metrics.high_gaps' "$REPORT_FILE")
+            
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              echo "has_critical=true" >> $GITHUB_OUTPUT
+              echo "CRITICAL=$CRITICAL" >> $GITHUB_OUTPUT
+              echo "HIGH=$HIGH" >> $GITHUB_OUTPUT
+            else
+              echo "has_critical=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "has_critical=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Slack Notification
+        if: steps.check.outputs.has_critical == 'true'
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+          custom_payload: |
+            {
+              "text": "🚨 Architecture Review Alert",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚨 Architecture Review: Critical Findings Detected"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch:*\n${{ github.ref }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Critical Gaps:*\n${{ steps.check.outputs.CRITICAL }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*High Gaps:*\n${{ steps.check.outputs.HIGH }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Please review the architecture review reports in the GitHub Actions artifacts."
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Security scan (optional)
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Run Bandit Security Scan
+        uses: pypa/bandit-action@v1
+        with:
+          path: bimbam_architecture_review/src
+      
+      - name: Run Safety Check
+        uses: pypa/gh-action-pip-audit@v1
+        with:
+          path: bimbam_architecture_review/requirements.txt
+
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          pip install ruff black mypy
+      
+      - name: Run Ruff
+        run: ruff check bimbam_architecture_review/src
+      
+      - name: Run Black
+        run: black --check bimbam_architecture_review/src
+      
+      - name: Run MyPy
+        run: mypy bimbam_architecture_review/src
+
+  # Test job
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install test dependencies
+        run: |
+          pip install pytest pytest-asyncio pytest-cov pytest-mock
+          pip install -e ./bimbam_architecture_review
+      
+      - name: Run Tests
+        run: |
+          pytest bimbam_architecture_review/tests -v --cov=bimbam_architecture_review --cov-report=xml
+      
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: unittests
