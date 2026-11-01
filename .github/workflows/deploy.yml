@@ -4,7 +4,28 @@ on:
     branches: [ main ]
 
 jobs:
+  validate-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validar conflictos de dependencias (pip check)
+        run: |
+          pip install -r bimbam-buy-ai-agent/requirements.txt
+          pip check
+
+      - name: Validar resolución de dependencias (dry-run)
+        run: |
+          pip install -r bimbam-buy-ai-agent/requirements.txt --dry-run
+
   deploy:
+    needs: validate-dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Disparar el Webhook de Render

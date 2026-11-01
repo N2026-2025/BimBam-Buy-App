@@ -17,18 +17,41 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Instalar dependencias
+      - name: Instalar dependencias de Python
         run: |
           cd bimbam-buy-ai-agent
           pip install -r requirements.txt
-          pip install playwright pytest
+          pip install playwright pytest pytest-playwright
+
+      - name: Validar conflictos de dependencias (pip check)
+        run: |
+          cd bimbam-buy-ai-agent
+          pip check
+
+      - name: Validar resolución de dependencias (dry-run)
+        run: |
+          cd bimbam-buy-ai-agent
+          pip install -r requirements.txt --dry-run
+
+      - name: Instalar navegador Chromium y dependencias de sistema
+        run: |
           playwright install chromium
+          playwright install-deps chromium
 
       - name: Levantar Streamlit en segundo plano
         run: |
           cd bimbam-buy-ai-agent
-          nohup streamlit run streamlit_app.py --server.port 8501 &
-          sleep 5 # Esperar a que el servidor web encienda
+          nohup streamlit run streamlit_app.py --server.port 8501 > streamlit.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8501 >/dev/null 2>&1; then
+              echo "Streamlit listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Streamlit no estuvo listo a tiempo:" >&2
+          cat streamlit.log >&2
+          exit 1
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
