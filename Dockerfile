@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY . .
 
+# Hace importables rag, monitoring y voice desde la raíz de la app.
+ENV PYTHONPATH=/app/bimbam-buy-ai-agent
+
 EXPOSE 8000
 
 # Al iniciar el contenedor, se construye/carga el índice y se levanta la API.
